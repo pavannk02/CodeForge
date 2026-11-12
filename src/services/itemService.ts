@@ -1,26 +1,26 @@
 // ──────────────────────────────────────────
-// Item Service — Supabase + Demo fallback
+// Item Service — Supabase + Persistent Local Demo Storage
 // ──────────────────────────────────────────
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Item, ItemType, Match, RecoveryRequest, Notification as AppNotification } from '@/types';
 import { findMatches } from '@/utils/matchingAlgorithm';
 
-// ─── Demo Data Store (in-memory, for local dev) ──────────
-const demoItems: Item[] = [
+// ─── Default Initial Seed Data ──────────
+const INITIAL_DEMO_ITEMS: Item[] = [
   {
     id: 'demo-item-1',
     user_id: 'demo-student-1',
     type: 'LOST',
     item_name: 'Black Leather Wallet',
     category: 'Wallets',
-    description: 'Black leather bi-fold wallet with college ID, ATM card, and some cash. Has a small scratch on the front.',
+    description: 'Black leather bi-fold wallet with MITE college ID, ATM card, and some cash. Has a small scratch on the front.',
     colour: 'Black',
     location: 'Library',
     item_date: new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0],
     status: 'ACTIVE',
     created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-    private_details: 'Has a photo of my dog inside. Contains student ID CS2024001.',
+    private_details: 'Has a photo of my dog inside. Contains student ID 4MT22CS042.',
   },
   {
     id: 'demo-item-2',
@@ -95,45 +95,118 @@ const demoItems: Item[] = [
   },
 ];
 
-const demoMatches: Match[] = [];
-const demoRecoveryRequests: RecoveryRequest[] = [];
-const demoNotifications: AppNotification[] = [
-  {
-    id: 'demo-notif-1',
-    user_id: 'demo-student-1',
-    title: 'Potential Match Found!',
-    message: 'We found a potential match for your "Black Leather Wallet". Check your AI Matches.',
-    type: 'MATCH_FOUND',
-    related_item_id: 'demo-item-1',
-    is_read: false,
-    created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
-  },
-  {
-    id: 'demo-notif-2',
-    user_id: 'demo-student-1',
-    title: 'Potential Match Found!',
-    message: 'We found a potential match for your "White AirPods Pro". Check your AI Matches.',
-    type: 'MATCH_FOUND',
-    related_item_id: 'demo-item-3',
-    is_read: false,
-    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-  },
-];
+// Helper functions for LocalStorage Persistence across sessions and users
+function getStoredItems(): Item[] {
+  try {
+    const raw = localStorage.getItem('mite_campusfind_items');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('LocalStorage items read error:', e);
+  }
+  return [...INITIAL_DEMO_ITEMS];
+}
 
-// Initialize demo matches
-function initDemoMatches() {
-  if (demoMatches.length > 0) return;
-  const lostItems = demoItems.filter(i => i.type === 'LOST');
-  lostItems.forEach(lost => {
-    const matches = findMatches(lost, demoItems, 30);
-    matches.forEach((m, idx) => {
-      demoMatches.push({
-        ...m,
-        id: `demo-match-${lost.id}-${idx}`,
-        created_at: new Date().toISOString(),
-      } as Match);
+function saveStoredItems(items: Item[]) {
+  try {
+    localStorage.setItem('mite_campusfind_items', JSON.stringify(items));
+  } catch (e) {
+    console.warn('LocalStorage items save error:', e);
+  }
+}
+
+function getStoredMatches(): Match[] {
+  try {
+    const raw = localStorage.getItem('mite_campusfind_matches');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn(e);
+  }
+  return [];
+}
+
+function saveStoredMatches(matches: Match[]) {
+  try {
+    localStorage.setItem('mite_campusfind_matches', JSON.stringify(matches));
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function getStoredRecoveries(): RecoveryRequest[] {
+  try {
+    const raw = localStorage.getItem('mite_campusfind_recoveries');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn(e);
+  }
+  return [];
+}
+
+function saveStoredRecoveries(reqs: RecoveryRequest[]) {
+  try {
+    localStorage.setItem('mite_campusfind_recoveries', JSON.stringify(reqs));
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function getStoredNotifs(): AppNotification[] {
+  try {
+    const raw = localStorage.getItem('mite_campusfind_notifs');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn(e);
+  }
+  return [
+    {
+      id: 'demo-notif-1',
+      user_id: 'demo-student-1',
+      title: 'Potential Match Found!',
+      message: 'We found a potential match for your "Black Leather Wallet". Check your AI Matches.',
+      type: 'MATCH_FOUND',
+      related_item_id: 'demo-item-1',
+      is_read: false,
+      created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    },
+    {
+      id: 'demo-notif-2',
+      user_id: 'demo-student-1',
+      title: 'Potential Match Found!',
+      message: 'We found a potential match for your "White AirPods Pro". Check your AI Matches.',
+      type: 'MATCH_FOUND',
+      related_item_id: 'demo-item-3',
+      is_read: false,
+      created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    },
+  ];
+}
+
+function saveStoredNotifs(notifs: AppNotification[]) {
+  try {
+    localStorage.setItem('mite_campusfind_notifs', JSON.stringify(notifs));
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+// Initialize matches if empty
+function refreshMatches() {
+  const items = getStoredItems();
+  let matches = getStoredMatches();
+  if (matches.length === 0) {
+    const lostItems = items.filter(i => i.type === 'LOST');
+    lostItems.forEach(lost => {
+      const foundList = findMatches(lost, items, 30);
+      foundList.forEach((m, idx) => {
+        matches.push({
+          ...m,
+          id: `match-${lost.id}-${idx}`,
+          created_at: new Date().toISOString(),
+        } as Match);
+      });
     });
-  });
+    saveStoredMatches(matches);
+  }
 }
 
 // ─── Service Functions ───────────────────────────────────
@@ -147,7 +220,7 @@ export async function getItems(filters?: {
   search?: string;
 }): Promise<Item[]> {
   if (!isSupabaseConfigured()) {
-    let items = [...demoItems];
+    let items = getStoredItems();
     if (filters?.type) items = items.filter(i => i.type === filters.type);
     if (filters?.category) items = items.filter(i => i.category === filters.category);
     if (filters?.location) items = items.filter(i => i.location === filters.location);
@@ -178,7 +251,8 @@ export async function getItems(filters?: {
 
 export async function getItem(id: string): Promise<Item | null> {
   if (!isSupabaseConfigured()) {
-    return demoItems.find(i => i.id === id) || null;
+    const items = getStoredItems();
+    return items.find(i => i.id === id) || null;
   }
   const { data, error } = await supabase
     .from('items')
@@ -191,23 +265,27 @@ export async function getItem(id: string): Promise<Item | null> {
 
 export async function createItem(item: Omit<Item, 'id' | 'created_at' | 'updated_at'>): Promise<Item> {
   if (!isSupabaseConfigured()) {
+    const items = getStoredItems();
     const newItem: Item = {
       ...item,
-      id: `demo-${Date.now()}`,
+      id: `item-${Date.now()}`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    demoItems.unshift(newItem);
+    items.unshift(newItem);
+    saveStoredItems(items);
 
-    // Trigger matching
-    const matches = findMatches(newItem, demoItems, 30);
-    matches.forEach((m, idx) => {
-      demoMatches.push({
+    // Compute new AI matches
+    const matches = getStoredMatches();
+    const newMatches = findMatches(newItem, items, 30);
+    newMatches.forEach((m, idx) => {
+      matches.unshift({
         ...m,
-        id: `demo-match-${newItem.id}-${idx}`,
+        id: `match-${newItem.id}-${idx}-${Date.now()}`,
         created_at: new Date().toISOString(),
       } as Match);
     });
+    saveStoredMatches(matches);
 
     return newItem;
   }
@@ -215,11 +293,9 @@ export async function createItem(item: Omit<Item, 'id' | 'created_at' | 'updated
   let finalUserId = item.user_id;
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id) {
-      finalUserId = user.id;
-    }
+    if (user?.id) finalUserId = user.id;
   } catch (err) {
-    console.warn('Could not determine active auth user:', err);
+    console.warn('Auth user fetch note:', err);
   }
 
   const payload = {
@@ -237,8 +313,12 @@ export async function createItem(item: Omit<Item, 'id' | 'created_at' | 'updated
 
 export async function updateItem(id: string, updates: Partial<Item>): Promise<void> {
   if (!isSupabaseConfigured()) {
-    const idx = demoItems.findIndex(i => i.id === id);
-    if (idx >= 0) Object.assign(demoItems[idx], updates, { updated_at: new Date().toISOString() });
+    const items = getStoredItems();
+    const idx = items.findIndex(i => i.id === id);
+    if (idx >= 0) {
+      Object.assign(items[idx], updates, { updated_at: new Date().toISOString() });
+      saveStoredItems(items);
+    }
     return;
   }
   const { error } = await supabase.from('items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
@@ -247,14 +327,13 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<vo
 
 export async function uploadImage(file: File, itemId: string): Promise<string> {
   if (!isSupabaseConfigured()) {
-    return URL.createObjectURL(file); // local blob URL for demo
+    return URL.createObjectURL(file);
   }
   try {
     const ext = file.name.split('.').pop();
     const path = `items/${itemId}.${ext}`;
     const { error } = await supabase.storage.from('item-images').upload(path, file, { upsert: true });
     if (error) {
-      console.warn('Storage upload notice (bucket permissions/not created):', error.message);
       return URL.createObjectURL(file);
     }
     const { data } = supabase.storage.from('item-images').getPublicUrl(path);
@@ -267,19 +346,19 @@ export async function uploadImage(file: File, itemId: string): Promise<string> {
 // ─── Matches ─────────────────────────────────────────────
 export async function getMatches(userId?: string): Promise<Match[]> {
   if (!isSupabaseConfigured()) {
-    initDemoMatches();
-    let matches = [...demoMatches];
+    refreshMatches();
+    const items = getStoredItems();
+    let matches = getStoredMatches();
     if (userId) {
-      const userItemIds = demoItems.filter(i => i.user_id === userId).map(i => i.id);
+      const userItemIds = items.filter(i => i.user_id === userId).map(i => i.id);
       matches = matches.filter(m =>
         userItemIds.includes(m.lost_item_id) || userItemIds.includes(m.found_item_id)
       );
     }
-    // Attach items
     return matches.map(m => ({
       ...m,
-      lost_item: demoItems.find(i => i.id === m.lost_item_id),
-      found_item: demoItems.find(i => i.id === m.found_item_id),
+      lost_item: items.find(i => i.id === m.lost_item_id),
+      found_item: items.find(i => i.id === m.found_item_id),
     })).sort((a, b) => b.similarity_score - a.similarity_score);
   }
 
@@ -292,14 +371,15 @@ export async function getMatches(userId?: string): Promise<Match[]> {
 // ─── Recovery Requests ───────────────────────────────────
 export async function getRecoveryRequests(userId?: string): Promise<RecoveryRequest[]> {
   if (!isSupabaseConfigured()) {
-    let reqs = [...demoRecoveryRequests];
+    const items = getStoredItems();
+    let reqs = getStoredRecoveries();
     if (userId) {
       reqs = reqs.filter(r => r.owner_id === userId || r.finder_id === userId);
     }
     return reqs.map(r => ({
       ...r,
-      lost_item: demoItems.find(i => i.id === r.lost_item_id),
-      found_item: demoItems.find(i => i.id === r.found_item_id),
+      lost_item: items.find(i => i.id === r.lost_item_id),
+      found_item: items.find(i => i.id === r.found_item_id),
     }));
   }
 
@@ -318,9 +398,10 @@ export async function createRecoveryRequest(req: {
   finder_id: string;
 }): Promise<RecoveryRequest> {
   if (!isSupabaseConfigured()) {
+    const reqs = getStoredRecoveries();
     const newReq: RecoveryRequest = {
       ...req,
-      id: `demo-recovery-${Date.now()}`,
+      id: `req-${Date.now()}`,
       status: 'REQUESTED',
       owner_confirmed: false,
       finder_confirmed: false,
@@ -328,10 +409,13 @@ export async function createRecoveryRequest(req: {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    demoRecoveryRequests.push(newReq);
-    // Notification
-    demoNotifications.push({
-      id: `demo-notif-${Date.now()}`,
+    reqs.unshift(newReq);
+    saveStoredRecoveries(reqs);
+
+    // Create notification for finder
+    const notifs = getStoredNotifs();
+    notifs.unshift({
+      id: `notif-${Date.now()}`,
       user_id: req.finder_id,
       title: 'Recovery Request Received',
       message: 'Someone claims the item you found. Check Recovery Requests.',
@@ -340,6 +424,8 @@ export async function createRecoveryRequest(req: {
       is_read: false,
       created_at: new Date().toISOString(),
     });
+    saveStoredNotifs(notifs);
+
     return newReq;
   }
 
@@ -353,8 +439,12 @@ export async function createRecoveryRequest(req: {
 
 export async function updateRecoveryRequest(id: string, updates: Partial<RecoveryRequest>): Promise<void> {
   if (!isSupabaseConfigured()) {
-    const idx = demoRecoveryRequests.findIndex(r => r.id === id);
-    if (idx >= 0) Object.assign(demoRecoveryRequests[idx], updates, { updated_at: new Date().toISOString() });
+    const reqs = getStoredRecoveries();
+    const idx = reqs.findIndex(r => r.id === id);
+    if (idx >= 0) {
+      Object.assign(reqs[idx], updates, { updated_at: new Date().toISOString() });
+      saveStoredRecoveries(reqs);
+    }
     return;
   }
   const { error } = await supabase.from('recovery_requests').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
@@ -364,7 +454,8 @@ export async function updateRecoveryRequest(id: string, updates: Partial<Recover
 // ─── Notifications ───────────────────────────────────────
 export async function getNotifications(userId: string): Promise<AppNotification[]> {
   if (!isSupabaseConfigured()) {
-    return demoNotifications
+    const notifs = getStoredNotifs();
+    return notifs
       .filter(n => n.user_id === userId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
@@ -380,8 +471,12 @@ export async function getNotifications(userId: string): Promise<AppNotification[
 
 export async function markNotificationRead(id: string): Promise<void> {
   if (!isSupabaseConfigured()) {
-    const n = demoNotifications.find(n => n.id === id);
-    if (n) n.is_read = true;
+    const notifs = getStoredNotifs();
+    const n = notifs.find(item => item.id === id);
+    if (n) {
+      n.is_read = true;
+      saveStoredNotifs(notifs);
+    }
     return;
   }
   await supabase.from('notifications').update({ is_read: true }).eq('id', id);
@@ -389,7 +484,9 @@ export async function markNotificationRead(id: string): Promise<void> {
 
 export async function markAllNotificationsRead(userId: string): Promise<void> {
   if (!isSupabaseConfigured()) {
-    demoNotifications.filter(n => n.user_id === userId).forEach(n => { n.is_read = true; });
+    const notifs = getStoredNotifs();
+    notifs.filter(n => n.user_id === userId).forEach(n => { n.is_read = true; });
+    saveStoredNotifs(notifs);
     return;
   }
   await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
@@ -413,4 +510,3 @@ export async function getDashboardStats(userId?: string) {
     recentRecoveries: recoveries.slice(0, 5),
   };
 }
-
