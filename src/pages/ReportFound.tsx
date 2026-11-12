@@ -128,7 +128,7 @@ export default function ReportFound() {
   // ─── Submit ────────────────────────────────
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!validate() || !profile) return;
+    if (!validate()) return;
 
     setSubmitting(true);
     setSubmitError(null);
@@ -142,7 +142,7 @@ export default function ReportFound() {
       }
 
       await createItem({
-        user_id: profile.id,
+        user_id: profile?.id || 'demo-student-2',
         type: 'FOUND',
         item_name: form.item_name.trim(),
         category: form.category as ItemCategory,
