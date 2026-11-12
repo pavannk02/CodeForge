@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { UserProfile } from '@/types';
+import type { UserProfile, UserRole } from '@/types';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -9,7 +9,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string, studentId?: string) => Promise<{ error?: string }>;
+  signUp: (email: string, password: string, fullName: string, studentId?: string, role?: UserRole) => Promise<{ error?: string }>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error?: string }>;
@@ -57,13 +57,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Fetch user profile from Supabase
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (!error && data) {
-      setProfile(data as UserProfile);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (!error && data) {
+        setProfile(data as UserProfile);
+      }
+    } catch (e) {
+      console.warn('Profile fetch warning:', e);
     }
   };
 
@@ -85,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(s?.user ?? null);
       if (s?.user) fetchProfile(s.user.id);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -98,9 +102,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [isConfigured]);
 
-  const signUp = async (email: string, password: string, fullName: string, studentId?: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    studentId?: string,
+    role: UserRole = 'student'
+  ) => {
     if (!isConfigured) {
       // Demo mode
       const newProfile: UserProfile = {
@@ -108,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         full_name: fullName,
         email,
         student_id: studentId,
-        role: 'student',
+        role,
         created_at: new Date().toISOString(),
         account_status: 'active',
       };
@@ -122,18 +132,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, student_id: studentId } },
+      options: {
+        data: {
+          full_name: fullName,
+          student_id: studentId,
+          role,
+        },
+      },
     });
     if (error) return { error: error.message };
 
-    // Create profile row
+    // Create profile row in Supabase
     if (data.user) {
-      await supabase.from('profiles').insert({
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: fullName,
         email,
         student_id: studentId,
-        role: 'student',
+        role,
+        account_status: 'active',
+      });
+      if (profileError) {
+        console.warn('Profile insert note:', profileError.message);
+      }
+
+      setProfile({
+        id: data.user.id,
+        full_name: fullName,
+        email,
+        student_id: studentId,
+        role,
+        created_at: new Date().toISOString(),
         account_status: 'active',
       });
     }
@@ -152,8 +181,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: 'Invalid credentials. Demo accounts: student@campus.edu, student2@campus.edu, admin@campus.edu (any 6+ char password)' };
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
+    if (data.user) {
+      await fetchProfile(data.user.id);
+    }
     return {};
   };
 
@@ -166,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await supabase.auth.signOut();
     setProfile(null);
+    setUser(null);
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
@@ -207,4 +240,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
-

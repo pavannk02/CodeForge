@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import type { UserRole } from '@/types';
 import {
   MapPin,
   Mail,
@@ -16,12 +17,15 @@ import {
   CheckCircle,
   Sparkles,
   Shield,
+  KeyRound,
 } from 'lucide-react';
 
 export default function RegisterPage() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
+  const [role, setRole] = useState<UserRole>('student');
+  const [adminCode, setAdminCode] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [studentId, setStudentId] = useState('');
@@ -40,6 +44,9 @@ export default function RegisterPage() {
     if (!isEmailValid(email.trim())) return 'Please enter a valid email address.';
     if (password.length < 6) return 'Password must be at least 6 characters.';
     if (password !== confirmPassword) return 'Passwords do not match.';
+    if (role === 'admin' && adminCode.trim() !== 'ADMIN2026' && adminCode.trim() !== 'admin') {
+      return 'Invalid Security Admin Passcode. Use "ADMIN2026" or select Student.';
+    }
     return null;
   };
 
@@ -51,13 +58,23 @@ export default function RegisterPage() {
     if (msg) return setError(msg);
 
     setLoading(true);
-    const result = await signUp(email.trim(), password, fullName.trim(), studentId.trim() || undefined);
+    const result = await signUp(
+      email.trim(),
+      password,
+      fullName.trim(),
+      studentId.trim() || undefined,
+      role
+    );
     setLoading(false);
 
     if (result.error) {
       setError(result.error);
     } else {
-      navigate('/dashboard');
+      if (role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     }
   };
 
@@ -89,62 +106,44 @@ export default function RegisterPage() {
     <div className="min-h-screen flex">
       {/* ───── LEFT: Branding ───── */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary-dark to-gray-900 relative overflow-hidden">
-        {/* decorative blobs */}
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-accent/20 blur-3xl" />
         <div className="absolute bottom-10 left-0 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl" />
 
         <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20 w-full">
-          {/* logo */}
           <Link to="/" className="flex items-center gap-3 mb-12">
             <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20">
               <MapPin className="w-6 h-6 text-white" />
             </div>
             <span className="text-2xl font-bold text-white tracking-tight">
-              Campus<span className="text-indigo-300">Find</span> AI
+              Campus<span className="text-accent">Find</span> AI
             </span>
           </Link>
 
           <h2 className="text-3xl xl:text-4xl font-extrabold text-white leading-tight">
-            Join CampusFind AI ✨
+            Join the smart campus lost & found network.
           </h2>
-          <p className="mt-4 text-indigo-200 text-lg leading-relaxed max-w-md">
-            Create a free account and start using AI to recover lost items on campus.
+          <p className="mt-4 text-base text-indigo-200/80 max-w-md">
+            Create an account to report missing items, match with discoverers, or supervise campus item returns.
           </p>
 
-          {/* benefits */}
-          <div className="mt-10 space-y-4">
+          <ul className="mt-10 space-y-4">
             {benefits.map((b) => (
-              <div key={b.text} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
-                  <b.icon className="w-5 h-5 text-indigo-300" />
+              <li key={b.text} className="flex items-center gap-3 text-sm text-indigo-100">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                  <b.icon className="w-4 h-4 text-accent" />
                 </div>
-                <span className="text-sm text-indigo-200 font-medium">{b.text}</span>
-              </div>
+                <span>{b.text}</span>
+              </li>
             ))}
-          </div>
-
-          {/* stats */}
-          <div className="mt-14 grid grid-cols-3 gap-4 max-w-sm">
-            {[
-              { n: '500+', l: 'Items Listed' },
-              { n: '300+', l: 'Recovered' },
-              { n: '95%', l: 'Accuracy' },
-            ].map((s) => (
-              <div key={s.l} className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center border border-white/10">
-                <p className="text-xl font-extrabold text-white">{s.n}</p>
-                <p className="text-[11px] text-indigo-300 mt-1">{s.l}</p>
-              </div>
-            ))}
-          </div>
+          </ul>
         </div>
       </div>
 
       {/* ───── RIGHT: Form ───── */}
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 bg-surface">
         <div className="w-full max-w-md animate-fade-in">
-          {/* mobile logo */}
           <div className="lg:hidden mb-8 flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-md">
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-primary">
@@ -155,7 +154,7 @@ export default function RegisterPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Create your account</h1>
           <p className="mt-2 text-gray-500">
             Already have an account?{' '}
-            <Link to="/login" className="text-accent font-semibold hover:underline">
+            <Link to="/login" className="text-primary font-semibold hover:underline">
               Log in
             </Link>
           </p>
@@ -168,7 +167,65 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            {/* Account Type Selector */}
+            <div>
+              <label className="label">Select Account Type</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRole('student')}
+                  className={`p-3 rounded-xl border text-left transition flex items-center gap-2.5 ${
+                    role === 'student'
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20 text-gray-900 font-semibold'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <User className={`w-5 h-5 ${role === 'student' ? 'text-primary' : 'text-gray-400'}`} />
+                  <div>
+                    <div className="text-xs font-bold">Student</div>
+                    <div className="text-[10px] text-gray-400">Report & Claim</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRole('admin')}
+                  className={`p-3 rounded-xl border text-left transition flex items-center gap-2.5 ${
+                    role === 'admin'
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20 text-gray-900 font-semibold'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <Shield className={`w-5 h-5 ${role === 'admin' ? 'text-primary' : 'text-gray-400'}`} />
+                  <div>
+                    <div className="text-xs font-bold">Campus Admin</div>
+                    <div className="text-[10px] text-gray-400">Security & Handover</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Admin passcode if admin selected */}
+            {role === 'admin' && (
+              <div className="p-3 bg-blue-50/70 border border-blue-200/60 rounded-xl animate-fade-in">
+                <label className="label text-blue-900 text-xs">Security Admin Authorization Passcode</label>
+                <div className="relative mt-1">
+                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
+                  <input
+                    type="password"
+                    placeholder="Enter ADMIN2026"
+                    value={adminCode}
+                    onChange={(e) => setAdminCode(e.target.value)}
+                    className="input-field !pl-10 !py-2 text-xs"
+                  />
+                </div>
+                <p className="text-[10px] text-blue-700 mt-1">
+                  Demo Passcode: <b>ADMIN2026</b>
+                </p>
+              </div>
+            )}
+
             {/* full name */}
             <div>
               <label htmlFor="fullName" className="label">Full Name</label>
@@ -178,7 +235,7 @@ export default function RegisterPage() {
                   id="fullName"
                   type="text"
                   autoComplete="name"
-                  placeholder="Aryan Kumar"
+                  placeholder={role === 'admin' ? 'Security Officer Name' : 'Aryan Kumar'}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="input-field !pl-11"
@@ -195,7 +252,7 @@ export default function RegisterPage() {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  placeholder="you@campus.edu"
+                  placeholder={role === 'admin' ? 'security@campus.edu' : 'student@campus.edu'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="input-field !pl-11"
@@ -204,22 +261,24 @@ export default function RegisterPage() {
             </div>
 
             {/* student ID */}
-            <div>
-              <label htmlFor="studentId" className="label">
-                Student ID <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <div className="relative">
-                <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  id="studentId"
-                  type="text"
-                  placeholder="CS2024001"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  className="input-field !pl-11"
-                />
+            {role === 'student' && (
+              <div>
+                <label htmlFor="studentId" className="label">
+                  Student ID <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    id="studentId"
+                    type="text"
+                    placeholder="CS2024001"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    className="input-field !pl-11"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* password */}
             <div>
@@ -239,12 +298,10 @@ export default function RegisterPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {/* strength bar */}
               {password && (
                 <div className="mt-2">
                   <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -278,11 +335,6 @@ export default function RegisterPage() {
                   <AlertCircle className="w-3.5 h-3.5" /> Passwords do not match
                 </p>
               )}
-              {confirmPassword && password === confirmPassword && confirmPassword.length >= 6 && (
-                <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" /> Passwords match
-                </p>
-              )}
             </div>
 
             {/* submit */}
@@ -297,7 +349,7 @@ export default function RegisterPage() {
                 </>
               ) : (
                 <>
-                  Create Account <ArrowRight className="w-5 h-5" />
+                  Create {role === 'admin' ? 'Campus Admin' : 'Student'} Account <ArrowRight className="w-5 h-5" />
                 </>
               )}
             </button>
