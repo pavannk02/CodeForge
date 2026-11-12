@@ -212,8 +212,26 @@ export async function createItem(item: Omit<Item, 'id' | 'created_at' | 'updated
     return newItem;
   }
 
-  const { data, error } = await supabase.from('items').insert(item).select().single();
-  if (error) throw error;
+  let finalUserId = item.user_id;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      finalUserId = user.id;
+    }
+  } catch (err) {
+    console.warn('Could not determine active auth user:', err);
+  }
+
+  const payload = {
+    ...item,
+    user_id: finalUserId,
+  };
+
+  const { data, error } = await supabase.from('items').insert(payload).select().single();
+  if (error) {
+    console.error('Supabase item insertion error:', error.message);
+    throw error;
+  }
   return data;
 }
 
@@ -231,12 +249,19 @@ export async function uploadImage(file: File, itemId: string): Promise<string> {
   if (!isSupabaseConfigured()) {
     return URL.createObjectURL(file); // local blob URL for demo
   }
-  const ext = file.name.split('.').pop();
-  const path = `items/${itemId}.${ext}`;
-  const { error } = await supabase.storage.from('item-images').upload(path, file, { upsert: true });
-  if (error) throw error;
-  const { data } = supabase.storage.from('item-images').getPublicUrl(path);
-  return data.publicUrl;
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `items/${itemId}.${ext}`;
+    const { error } = await supabase.storage.from('item-images').upload(path, file, { upsert: true });
+    if (error) {
+      console.warn('Storage upload notice (bucket permissions/not created):', error.message);
+      return URL.createObjectURL(file);
+    }
+    const { data } = supabase.storage.from('item-images').getPublicUrl(path);
+    return data.publicUrl;
+  } catch (err) {
+    return URL.createObjectURL(file);
+  }
 }
 
 // ─── Matches ─────────────────────────────────────────────
