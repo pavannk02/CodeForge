@@ -103,7 +103,7 @@ ALTER TABLE public.recovery_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_logs ENABLE ROW LEVEL SECURITY;
 
--- Profiles
+-- Profiles: readable by all authenticated users, editable only by profile owner
 CREATE POLICY "Public profiles are viewable by all users" ON public.profiles
   FOR SELECT USING (true);
 
@@ -113,7 +113,7 @@ CREATE POLICY "Users can insert their own profile" ON public.profiles
 CREATE POLICY "Users can update their own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
--- Items
+-- Items: public items readable by all; private_details protected in app logic
 CREATE POLICY "Items are viewable by everyone" ON public.items
   FOR SELECT USING (true);
 
@@ -126,7 +126,7 @@ CREATE POLICY "Users can update their own items" ON public.items
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
--- Matches
+-- Matches: viewable by participants or admin
 CREATE POLICY "Matches viewable by item owners or admin" ON public.matches
   FOR SELECT USING (
     EXISTS (
@@ -137,7 +137,7 @@ CREATE POLICY "Matches viewable by item owners or admin" ON public.matches
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
--- Recovery requests
+-- Recovery requests: viewable by owner, finder, or admin
 CREATE POLICY "Recovery requests viewable by participants and admin" ON public.recovery_requests
   FOR SELECT USING (
     auth.uid() = owner_id OR 
@@ -152,10 +152,13 @@ CREATE POLICY "Participants can update recovery requests" ON public.recovery_req
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
--- Notifications
+-- Notifications: strictly user private
 CREATE POLICY "Notifications viewable only by recipient" ON public.notifications
   FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own notifications" ON public.notifications
   FOR UPDATE USING (auth.uid() = user_id);
+
+-- Storage bucket setup
+-- Run in Storage: create bucket "item-images" with public access
 
