@@ -10,7 +10,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string, studentId?: string, role?: UserRole) => Promise<{ error?: string }>;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ error?: string; isAdmin?: boolean }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error?: string }>;
 }
@@ -19,28 +19,46 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Demo profiles for local dev without Supabase
 const DEMO_PROFILES: Record<string, UserProfile> = {
-  'student@campus.edu': {
+  'student@mite.ac.in': {
     id: 'demo-student-1',
     full_name: 'Aryan Kumar',
-    email: 'student@campus.edu',
-    student_id: 'CS2024001',
+    email: 'student@mite.ac.in',
+    student_id: '4MT22CS042',
     role: 'student',
     created_at: new Date().toISOString(),
     account_status: 'active',
   },
-  'student2@campus.edu': {
+  'student2@mite.ac.in': {
     id: 'demo-student-2',
     full_name: 'Neha Sharma',
-    email: 'student2@campus.edu',
-    student_id: 'CS2024002',
+    email: 'student2@mite.ac.in',
+    student_id: '4MT22CS088',
+    role: 'student',
+    created_at: new Date().toISOString(),
+    account_status: 'active',
+  },
+  'admin@mite.ac.in': {
+    id: 'demo-admin-1',
+    full_name: 'MITE Security Admin',
+    email: 'admin@mite.ac.in',
+    role: 'admin',
+    created_at: new Date().toISOString(),
+    account_status: 'active',
+  },
+  // Legacy aliases for backward compatibility
+  'student@campus.edu': {
+    id: 'demo-student-1',
+    full_name: 'Aryan Kumar',
+    email: 'student@mite.ac.in',
+    student_id: '4MT22CS042',
     role: 'student',
     created_at: new Date().toISOString(),
     account_status: 'active',
   },
   'admin@campus.edu': {
     id: 'demo-admin-1',
-    full_name: 'Security Admin',
-    email: 'admin@campus.edu',
+    full_name: 'MITE Security Admin',
+    email: 'admin@mite.ac.in',
     role: 'admin',
     created_at: new Date().toISOString(),
     account_status: 'active',
@@ -65,10 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       if (!error && data) {
         setProfile(data as UserProfile);
+        return data as UserProfile;
       }
     } catch (e) {
       console.warn('Profile fetch warning:', e);
     }
+    return null;
   };
 
   useEffect(() => {
@@ -111,26 +131,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     studentId?: string,
     role: UserRole = 'student'
   ) => {
+    const cleanEmail = email.toLowerCase().trim();
+
     if (!isConfigured) {
       // Demo mode
       const newProfile: UserProfile = {
         id: `demo-${Date.now()}`,
         full_name: fullName,
-        email,
+        email: cleanEmail,
         student_id: studentId,
         role,
         created_at: new Date().toISOString(),
         account_status: 'active',
       };
-      DEMO_PROFILES[email] = newProfile;
+      DEMO_PROFILES[cleanEmail] = newProfile;
       setProfile(newProfile);
-      setUser({ id: newProfile.id, email } as User);
-      localStorage.setItem('demo_user_email', email);
+      setUser({ id: newProfile.id, email: cleanEmail } as User);
+      localStorage.setItem('demo_user_email', cleanEmail);
       return {};
     }
 
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: cleanEmail,
       password,
       options: {
         data: {
@@ -144,22 +166,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Create profile row in Supabase
     if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').upsert({
+      await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: fullName,
-        email,
+        email: cleanEmail,
         student_id: studentId,
         role,
         account_status: 'active',
       });
-      if (profileError) {
-        console.warn('Profile insert note:', profileError.message);
-      }
 
       setProfile({
         id: data.user.id,
         full_name: fullName,
-        email,
+        email: cleanEmail,
         student_id: studentId,
         role,
         created_at: new Date().toISOString(),
@@ -170,21 +189,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    const cleanEmail = email.toLowerCase().trim();
+
     if (!isConfigured) {
-      const demoProfile = DEMO_PROFILES[email];
+      const demoProfile = DEMO_PROFILES[cleanEmail];
       if (demoProfile && password.length >= 6) {
         setProfile(demoProfile);
-        setUser({ id: demoProfile.id, email } as User);
-        localStorage.setItem('demo_user_email', email);
-        return {};
+        setUser({ id: demoProfile.id, email: cleanEmail } as User);
+        localStorage.setItem('demo_user_email', cleanEmail);
+        return { isAdmin: demoProfile.role === 'admin' };
       }
-      return { error: 'Invalid credentials. Demo accounts: student@campus.edu, student2@campus.edu, admin@campus.edu (any 6+ char password)' };
+      return {
+        error: 'Invalid credentials. MITE accounts: student@mite.ac.in, student2@mite.ac.in, admin@mite.ac.in (any 6+ char password)',
+      };
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    });
     if (error) return { error: error.message };
     if (data.user) {
-      await fetchProfile(data.user.id);
+      const p = await fetchProfile(data.user.id);
+      return { isAdmin: p?.role === 'admin' || cleanEmail === 'admin@mite.ac.in' };
     }
     return {};
   };
@@ -223,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         session,
         loading,
-        isAdmin: profile?.role === 'admin',
+        isAdmin: profile?.role === 'admin' || profile?.email === 'admin@mite.ac.in',
         signUp,
         signIn,
         signOut,

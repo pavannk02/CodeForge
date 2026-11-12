@@ -36,18 +36,50 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   /* validation helpers */
-  const isEmailValid = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const isMiteEmail = (v: string) => v.toLowerCase().trim().endsWith('@mite.ac.in');
 
   const validate = (): string | null => {
+    const cleanEmail = email.toLowerCase().trim();
     if (!fullName.trim()) return 'Full name is required.';
-    if (!email.trim()) return 'Email is required.';
-    if (!isEmailValid(email.trim())) return 'Please enter a valid email address.';
+    if (!cleanEmail) return 'College email is required.';
+    
+    // Strict domain check for @mite.ac.in
+    if (!isMiteEmail(cleanEmail)) {
+      return 'Registration restricted: Only official MITE college emails (@mite.ac.in) are permitted.';
+    }
+
+    // Role-specific validation
+    if (role === 'admin') {
+      if (cleanEmail !== 'admin@mite.ac.in') {
+        return 'Only the authorized security email (admin@mite.ac.in) can be registered as Campus Admin.';
+      }
+      if (adminCode.trim() !== 'ADMIN2026' && adminCode.trim() !== 'admin') {
+        return 'Invalid Security Admin Passcode. Use "ADMIN2026" or register as Student.';
+      }
+    } else {
+      // Student cannot use the master admin email for normal student account
+      if (cleanEmail === 'admin@mite.ac.in') {
+        return 'admin@mite.ac.in is reserved for the Campus Security Admin. Please select Campus Admin above.';
+      }
+    }
+
     if (password.length < 6) return 'Password must be at least 6 characters.';
     if (password !== confirmPassword) return 'Passwords do not match.';
-    if (role === 'admin' && adminCode.trim() !== 'ADMIN2026' && adminCode.trim() !== 'admin') {
-      return 'Invalid Security Admin Passcode. Use "ADMIN2026" or select Student.';
-    }
     return null;
+  };
+
+  const handleRoleChange = (newRole: UserRole) => {
+    setRole(newRole);
+    setError('');
+    if (newRole === 'admin') {
+      setEmail('admin@mite.ac.in');
+      setFullName('MITE Security Admin');
+    } else {
+      if (email === 'admin@mite.ac.in') {
+        setEmail('');
+        setFullName('');
+      }
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -59,7 +91,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     const result = await signUp(
-      email.trim(),
+      email.toLowerCase().trim(),
       password,
       fullName.trim(),
       studentId.trim() || undefined,
@@ -94,12 +126,11 @@ export default function RegisterPage() {
     return { pct: 100, label: 'Excellent', color: 'bg-emerald-600' };
   })();
 
-  /* benefits for left panel */
   const benefits = [
-    { icon: Search, text: 'AI matches your items in seconds' },
-    { icon: Shield, text: 'Verified recovery process' },
-    { icon: Sparkles, text: 'Smart notifications & filters' },
-    { icon: CheckCircle, text: '100% free for all students' },
+    { icon: Search, text: 'AI matches your lost & found belongings' },
+    { icon: Shield, text: 'Verified TrustLoop in-person handover' },
+    { icon: Sparkles, text: 'Instant alerts on matching items' },
+    { icon: CheckCircle, text: 'Exclusive to MITE students & campus staff' },
   ];
 
   return (
@@ -115,18 +146,22 @@ export default function RegisterPage() {
               <MapPin className="w-6 h-6 text-white" />
             </div>
             <span className="text-2xl font-bold text-white tracking-tight">
-              Campus<span className="text-accent">Find</span> AI
+              MITE <span className="text-accent">CampusFind</span> AI
             </span>
           </Link>
 
           <h2 className="text-3xl xl:text-4xl font-extrabold text-white leading-tight">
-            Join the smart campus lost & found network.
+            Official Lost & Found Network for MITE.
           </h2>
           <p className="mt-4 text-base text-indigo-200/80 max-w-md">
-            Create an account to report missing items, match with discoverers, or supervise campus item returns.
+            Mangalore Institute of Technology & Engineering — connect finders and owners with AI matching and secure campus verification.
           </p>
 
-          <ul className="mt-10 space-y-4">
+          <div className="mt-8 inline-block px-3.5 py-1.5 rounded-full bg-white/10 text-xs font-semibold text-white border border-white/20">
+            🔒 Restricted to <b>@mite.ac.in</b> domains
+          </div>
+
+          <ul className="mt-8 space-y-4">
             {benefits.map((b) => (
               <li key={b.text} className="flex items-center gap-3 text-sm text-indigo-100">
                 <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
@@ -147,13 +182,13 @@ export default function RegisterPage() {
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-primary">
-              Campus<span className="text-accent">Find</span> AI
+              MITE <span className="text-accent">CampusFind</span>
             </span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Create your account</h1>
           <p className="mt-2 text-gray-500">
-            Already have an account?{' '}
+            Already registered?{' '}
             <Link to="/login" className="text-primary font-semibold hover:underline">
               Log in
             </Link>
@@ -174,7 +209,7 @@ export default function RegisterPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setRole('student')}
+                  onClick={() => handleRoleChange('student')}
                   className={`p-3 rounded-xl border text-left transition flex items-center gap-2.5 ${
                     role === 'student'
                       ? 'border-primary bg-primary/5 ring-2 ring-primary/20 text-gray-900 font-semibold'
@@ -183,14 +218,14 @@ export default function RegisterPage() {
                 >
                   <User className={`w-5 h-5 ${role === 'student' ? 'text-primary' : 'text-gray-400'}`} />
                   <div>
-                    <div className="text-xs font-bold">Student</div>
-                    <div className="text-[10px] text-gray-400">Report & Claim</div>
+                    <div className="text-xs font-bold">MITE Student</div>
+                    <div className="text-[10px] text-gray-400">@mite.ac.in</div>
                   </div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setRole('admin')}
+                  onClick={() => handleRoleChange('admin')}
                   className={`p-3 rounded-xl border text-left transition flex items-center gap-2.5 ${
                     role === 'admin'
                       ? 'border-primary bg-primary/5 ring-2 ring-primary/20 text-gray-900 font-semibold'
@@ -200,7 +235,7 @@ export default function RegisterPage() {
                   <Shield className={`w-5 h-5 ${role === 'admin' ? 'text-primary' : 'text-gray-400'}`} />
                   <div>
                     <div className="text-xs font-bold">Campus Admin</div>
-                    <div className="text-[10px] text-gray-400">Security & Handover</div>
+                    <div className="text-[10px] text-gray-400">admin@mite.ac.in</div>
                   </div>
                 </button>
               </div>
@@ -208,21 +243,24 @@ export default function RegisterPage() {
 
             {/* Admin passcode if admin selected */}
             {role === 'admin' && (
-              <div className="p-3 bg-blue-50/70 border border-blue-200/60 rounded-xl animate-fade-in">
-                <label className="label text-blue-900 text-xs">Security Admin Authorization Passcode</label>
-                <div className="relative mt-1">
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl animate-fade-in space-y-2">
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-bold">
+                  <Shield className="w-4 h-4 text-blue-700" />
+                  MITE Campus Security Desk
+                </div>
+                <p className="text-[11px] text-blue-700">
+                  Only <b>admin@mite.ac.in</b> is authorized. Passcode: <b>ADMIN2026</b>
+                </p>
+                <div className="relative">
                   <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
                   <input
                     type="password"
-                    placeholder="Enter ADMIN2026"
+                    placeholder="Enter Security Passcode (ADMIN2026)"
                     value={adminCode}
                     onChange={(e) => setAdminCode(e.target.value)}
                     className="input-field !pl-10 !py-2 text-xs"
                   />
                 </div>
-                <p className="text-[10px] text-blue-700 mt-1">
-                  Demo Passcode: <b>ADMIN2026</b>
-                </p>
               </div>
             )}
 
@@ -235,7 +273,7 @@ export default function RegisterPage() {
                   id="fullName"
                   type="text"
                   autoComplete="name"
-                  placeholder={role === 'admin' ? 'Security Officer Name' : 'Aryan Kumar'}
+                  placeholder={role === 'admin' ? 'MITE Security Admin' : 'e.g. Aryan Kumar'}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="input-field !pl-11"
@@ -245,17 +283,21 @@ export default function RegisterPage() {
 
             {/* email */}
             <div>
-              <label htmlFor="email" className="label">College Email</label>
+              <label htmlFor="email" className="label flex items-center justify-between">
+                <span>College Email</span>
+                <span className="text-[11px] font-semibold text-primary">Must end with @mite.ac.in</span>
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   id="email"
                   type="email"
                   autoComplete="email"
-                  placeholder={role === 'admin' ? 'security@campus.edu' : 'student@campus.edu'}
+                  placeholder={role === 'admin' ? 'admin@mite.ac.in' : 'yourname@mite.ac.in'}
                   value={email}
+                  readOnly={role === 'admin'}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="input-field !pl-11"
+                  className={`input-field !pl-11 ${role === 'admin' ? 'bg-gray-100 cursor-not-allowed font-medium text-gray-700' : ''}`}
                 />
               </div>
             </div>
@@ -264,14 +306,14 @@ export default function RegisterPage() {
             {role === 'student' && (
               <div>
                 <label htmlFor="studentId" className="label">
-                  Student ID <span className="text-gray-400 font-normal">(optional)</span>
+                  USN / Student ID <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <div className="relative">
                   <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     id="studentId"
                     type="text"
-                    placeholder="CS2024001"
+                    placeholder="e.g. 4MT22CS042"
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
                     className="input-field !pl-11"
@@ -349,14 +391,14 @@ export default function RegisterPage() {
                 </>
               ) : (
                 <>
-                  Create {role === 'admin' ? 'Campus Admin' : 'Student'} Account <ArrowRight className="w-5 h-5" />
+                  Register as {role === 'admin' ? 'Campus Admin' : 'MITE Student'} <ArrowRight className="w-5 h-5" />
                 </>
               )}
             </button>
           </form>
 
           <p className="mt-6 text-center text-xs text-gray-400">
-            By registering, you agree to our Terms of Service and Privacy Policy.
+            By registering, you agree to MITE CampusFind Terms & Safety Policies.
           </p>
         </div>
       </div>
