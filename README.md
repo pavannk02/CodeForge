@@ -1,46 +1,149 @@
-# 🎓 CampusFind AI — Smart Campus Lost & Found Platform
+# CampusFind AI
 
-> **"Lost something? Let AI help you find it."**  
-> AI identifies potential matches. Students communicate directly. Humans verify ownership. Campus security ensures safe recovery.
+**A smart, AI-assisted lost-and-found platform for campuses.**
 
-Built for the **CodeForge Hackathon** adhering strictly to `plan.md` specifications and high-fidelity SaaS design principles.
+CampusFind AI helps students report missing or found belongings, discover potential matches, and complete item recovery through a structured, role-based workflow. The application also includes an admin portal for campus security to review reports and oversee handovers.
 
----
+**Live demo:** https://code-forge-rust-iota.vercel.app
 
-## 📸 Design Inspiration & Admin Dashboard
+## About
 
-The application features a tailored **Campus Lost & Found Admin Portal** replicating the provided dashboard layout:
-- **5 High-Level Metric Tiles**: Total Reports (`+12%`), Lost Reports (`+8%`), Found Reports (`+16%`), Potential Matches, and Pending Requests.
-- **TrustLoop Recovery Overview**: Interactive SVG trend curve for weekly recovered items and recovery rate (`67%`).
-- **Reports by Category**: Donut breakdown showing Electronics (38%), Accessories (21%), Documents (15%), Bags (13%), Others (13%).
-- **Verification Portal**: Confidential private evidence inspection (unrevealed markings/contents) before approving claims.
+CampusFind AI centralizes campus lost-and-found activity instead of relying on scattered WhatsApp messages, notice boards, and security-office records.
 
----
+The platform allows users to:
 
-## ⚡ Quick Start
+- Submit detailed lost and found reports with locations, descriptions, dates, and images
+- Explore campus reports and view item details
+- Find potential lost-versus-found matches using a weighted similarity algorithm
+- Use TrustLoop recovery requests to coordinate secure meetings and handovers
+- Receive in-app notifications about matches and recovery status changes
+- Manage reports and user activity through a dedicated admin dashboard
 
-### 1. Run Development Server
+AI suggestions are used only to rank potential matches. Ownership is still verified by humans before an item is marked as recovered.
+
+## Features
+
+- **Student accounts:** registration, login, protected routes, and profiles
+- **Lost and found reporting:** item category, color, location, date, description, private details, and image support
+- **Item discovery:** searchable and filterable public item listings
+- **AI matching:** weighted scores based on description, category, location, and date similarity
+- **TrustLoop workflow:** recovery requests, acceptance, meeting scheduling, verification, and handover confirmation
+- **Notifications:** updates for matches, recovery requests, meetings, and completed returns
+- **Admin portal:** report, match, recovery, verification, user, analytics, settings, and returned-item management
+- **Demo mode:** works with in-memory data when Supabase credentials are not configured
+
+## Tech Stack
+
+- React 19
+- TypeScript
+- Vite
+- React Router
+- Tailwind CSS
+- Supabase (PostgreSQL, Authentication, and database services)
+- Lucide React
+- Oxlint
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18 or later
+- npm
+- Optional: a Supabase project
+
+### Installation
+
 ```bash
 npm install
+```
+
+### Run locally
+
+```bash
 npm run dev
 ```
 
-### 2. Ready-To-Test Demo Credentials
-The application operates in **Local Demo Mode** by default when Supabase environment variables are not supplied. You can log in right away with any password (6+ chars):
+Open the local URL printed by Vite.
 
-| Role | Email | Password | Access |
-| :--- | :--- | :--- | :--- |
-| **Student (Aryan)** | `student@campus.edu` | `password123` | Student Dashboard, Report Lost/Found, Matches, Recovery Claims |
-| **Student (Neha)** | `student2@campus.edu` | `password123` | Multi-user TrustLoop testing (Finder role) |
-| **Admin / Security** | `admin@campus.edu` | `password123` | Full Campus Security Admin Portal (`/admin/*`) |
+### Demo mode
 
----
+If `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are not provided, the application automatically uses a local demo mode with ready-to-test accounts.
 
-## 🛠️ Architecture & Tech Stack
+Demo accounts:
 
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React icons
-- **Router**: React Router v7 with protected routes & role-based access
-- **AI Matching Engine**: Multi-factor weighted similarity algorithm:
-  $$\text{Match Score} = (D \times 0.35) + (C \times 0.25) + (L \times 0.25) + (T \times 0.15)$$
-- **Backend / Database**: **Supabase** (PostgreSQL, Supabase Auth, Storage) + Local In-Memory Fallback
-- **Security & Privacy**: Private evidence encryption/isolation preventing unauthorized disclosure of confidential personal identifying marks.
+| Role | Email | Password |
+|---|---|---|
+| Student | `student@campus.edu` | `password123` |
+| Student | `student2@campus.edu` | `password123` |
+| Admin | `admin@campus.edu` | `password123` |
+
+## Supabase Configuration
+
+For persistent database and authentication support:
+
+1. Create a Supabase project.
+2. Copy `.env.example` to `.env`:
+
+```bash
+cp .env.example .env
+```
+
+3. Add your Supabase project URL and anonymous key:
+
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+4. Run `supabase_schema.sql` in the Supabase SQL editor to create the application tables and demo RLS policies.
+
+> Supabase credentials and database policies should be reviewed before using the demo in production. Private details, role checks, and admin authorization must be enforced server-side for a real deployment.
+
+## Scripts
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Create a production build |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | Run Oxlint |
+
+## Project Structure
+
+```text
+src/
+├── components/     # Shared UI and dashboard layout components
+├── context/        # Authentication context and providers
+├── lib/            # Supabase and application constants
+├── pages/          # Student, public, and admin pages
+├── services/       # Application data and integration logic
+├── types/          # Shared TypeScript types
+├── utils/          # Matching and helper utilities
+├── App.tsx         # Application routes
+└── main.tsx        # React entry point
+```
+
+## Database
+
+The Supabase schema provides tables for:
+
+- Profiles
+- Lost and found items
+- AI-generated matches
+- Recovery requests
+- Notifications
+- Administrative logs
+
+See `supabase_schema.sql` for table definitions and policies.
+
+## Development Plan
+
+See `PLAN.md` for the full feature specification, data model, trust and safety requirements, testing scenarios, and implementation roadmap.
+
+## Safety and Privacy
+
+- Never publish full student IDs, banking details, passwords, or unnecessary personal contact information.
+- Keep ownership evidence private and disclose it only to authorized participants.
+- Use supervised campus locations for valuable-item handovers.
+- Do not treat an algorithmic match as proof of ownership.
+- Require real authentication and server-side authorization before deploying role-restricted features.
